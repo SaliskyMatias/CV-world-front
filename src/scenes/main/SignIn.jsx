@@ -9,6 +9,7 @@ import register from "../../redux/actions/users/register";
 import { auth } from "../../config/firebase-config";
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword  } from 'firebase/auth';
 
+import validation from "./signInValidation";
 
 function SignIn() {
   const navigate = useNavigate();
@@ -24,6 +25,11 @@ function SignIn() {
     message: null
   });
 
+  const [errors, setErrors] = useState({
+    email: null,
+    password: null,
+  });
+
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (event) => {
@@ -32,10 +38,22 @@ function SignIn() {
       [event.target.name]: event.target.value
     });
 
+    console.log(loginInfo);
+
     setLoginStatus({
       status: null,
       message: null
     });
+
+    const validationErrors = validation({
+      ...loginInfo,
+      [event.target.name]: event.target.value,
+    });
+
+    setErrors((errors) => ({
+      ...errors,
+      [event.target.name]: validationErrors[event.target.name],
+    }));
   };
 
   const handleTogglePassword = () => {
@@ -47,27 +65,38 @@ function SignIn() {
       const userCredential = await signInWithPopup(auth, provider);
 
       if (userCredential) {
-        console.log("User Credential: ", userCredential);
-        console.log(userCredential._tokenResponse)
-        console.log(userCredential._tokenResponse.isNewUser)
 
         if (
           userCredential._tokenResponse &&
           userCredential._tokenResponse.isNewUser
         ) {
-          console.log(userCredential.user.photoURL);
-          await register({
+          const loginStatus = await register({
             name: userCredential.user.displayName,
             email: userCredential.user.email,
             photo: userCredential.user.photoURL,
             password: "",
           });
+
+          if (loginStatus.status === "Success") {
+            setLoginStatus({
+              status: "Success",
+              message: "¡Bienvenido!"
+            });
+
+          } else {
+            setLoginStatus({ ...loginStatus })
+            return;
+          }
         }
         login(userCredential.user.accessToken);
         navigate("/curriculums");
+
       }
     } catch (error) {
-      console.error("Error during login:", error);
+      setLoginStatus({
+        status: "Fail",
+        message: "Error de autenticación de terceros"
+      })
     }
   };
 
@@ -75,43 +104,50 @@ function SignIn() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    const validationErrors = validation(loginInfo, 'all');
+    setErrors(validationErrors);
+
+    console.log(errors);
+
     if (
       !loginInfo.email ||
       !loginInfo.password
     ) {
       setLoginStatus({
         status: "Fail",
-        message: "Por favor, completá todos los campos"
+        message: "Faltan completar campos obligatorios"
       });
-      return;
     } else {
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, loginInfo.email, loginInfo.password);
-        console.log("User Credential: ", userCredential);
-        const emailVerified = userCredential.user.emailVerified;
+      if (!errors.email &&
+        !errors.password
+      ) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, loginInfo.email, loginInfo.password);
+          console.log("User Credential: ", userCredential);
+          const emailVerified = userCredential.user.emailVerified;
 
-        if (emailVerified) {
-          login(userCredential.user.accessToken);
+          if (emailVerified) {
+            login(userCredential.user.accessToken);
 
-          setLoginStatus({
-            status: "Success",
-            message: "¡Bienvenido!"
-          });
+            setLoginStatus({
+              status: "Success",
+              message: "¡Bienvenido!"
+            });
 
-          setTimeout(() => {
             navigate("/curriculums");
-          }, 2000);
-        } else {
+
+          } else {
+            setLoginStatus({
+              status: "Fail",
+              message: "Por favor verificá tu correo electrónico con el enlace que enviamos a tu casilla de correo"
+            });
+          }
+        } catch (error) {
           setLoginStatus({
             status: "Fail",
-            message: "Por favor verificá tu correo electrónico con el enlace que enviamos a tu casilla de correo"
+            message: "Email o contraseña incorrectos"
           });
         }
-      } catch (error) {
-        setLoginStatus({
-          status: "Fail",
-          message: "Email o contraseña incorrectos"
-        });
       }
     }
   };
@@ -130,10 +166,11 @@ function SignIn() {
               className={styles.input}
               name="email"
               type="text"
-              placeholder="Ingresá tu contraseña..."
+              placeholder="Ingresá tu email..."
               onChange={handleChange}
               value={loginInfo.email}
             />
+            {errors.email ? <p className={styles.txtError}>{errors.email}</p> : null}
           </div>
           <div className={styles.vertical}>
             <label className={styles.txtSemiBold16Purple}>CONTRASEÑA</label>
@@ -189,6 +226,7 @@ function SignIn() {
                 )}
               </button>
             </div>
+            {errors.password ? <p className={styles.txtError}>{errors.password}</p> : null}
           </div>
           <Link className={styles.txtSemiBold12Purple} to="/resetpassword">¿Olvidaste tu contraseña?</Link>
           <button className={styles.btnLogin}>INICIAR SESION</button>
@@ -197,7 +235,21 @@ function SignIn() {
         <p className={styles.txtSemiBold12Purple}>O INICIA SESION CON</p>
         <button className={styles.btnGoogle} onClick={loginWithGoogle}>
           <svg className={styles.icn} xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0,0,256,256">
-            <g fill="#3e3e70" fill-rule="nonzero" stroke="none" strokeWidth="1" strokeLinecap="butt" strokeLinejoin="miter" stroke-miterlimit="10" strokeDasharray="" strokeDashoffset="0" font-family="none" font-weight="none" font-size="none" text-anchor="none" ><g transform="scale(8.53333,8.53333)"><path d="M15.00391,3c-6.629,0 -12.00391,5.373 -12.00391,12c0,6.627 5.37491,12 12.00391,12c10.01,0 12.26517,-9.293 11.32617,-14h-1.33008h-2.26758h-7.73242v4h7.73828c-0.88958,3.44825 -4.01233,6 -7.73828,6c-4.418,0 -8,-3.582 -8,-8c0,-4.418 3.582,-8 8,-8c2.009,0 3.83914,0.74575 5.24414,1.96875l2.8418,-2.83984c-2.134,-1.944 -4.96903,-3.12891 -8.08203,-3.12891z"></path></g></g>
+            <g fill="#3e3e70"
+              fillRule="nonzero"
+              stroke="none"
+              strokeWidth="1"
+              strokeLinecap="butt"
+              strokeLinejoin="miter"
+              strokeMiterlimit="10"
+              strokeDasharray=""
+              strokeDashoffset="0"
+              fontFamily="none"
+              fontWeight="none"
+              fontSize="none"
+              textAnchor="none" >
+              <g transform="scale(8.53333,8.53333)">
+                <path d="M15.00391,3c-6.629,0 -12.00391,5.373 -12.00391,12c0,6.627 5.37491,12 12.00391,12c10.01,0 12.26517,-9.293 11.32617,-14h-1.33008h-2.26758h-7.73242v4h7.73828c-0.88958,3.44825 -4.01233,6 -7.73828,6c-4.418,0 -8,-3.582 -8,-8c0,-4.418 3.582,-8 8,-8c2.009,0 3.83914,0.74575 5.24414,1.96875l2.8418,-2.83984c-2.134,-1.944 -4.96903,-3.12891 -8.08203,-3.12891z"></path></g></g>
           </svg>
           Google
         </button>

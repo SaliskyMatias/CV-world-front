@@ -40,6 +40,8 @@ function SignUp() {
   const [showSecondPassword, setShowSecondPassword] = useState(false);
 
   const handleChange = (event) => {
+    let registerInfoUpdated = { ...registerInfo };
+
     setRegisterInfo({
       ...registerInfo,
       [event.target.name]: event.target.value
@@ -55,11 +57,10 @@ function SignUp() {
       [event.target.name]: event.target.value,
     }, event.target.name);
 
-    setErrors({
+    setErrors((errors) => ({
       ...errors,
-      [event.target.name]: validationErrors[event.target.name]
-    }
-    );
+      [event.target.name]: validationErrors[event.target.name],
+    }));
   };
 
   // Para mostrar y ocultar la contraseña
@@ -76,21 +77,35 @@ function SignUp() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-  
-    if (!registerInfo.name || !registerInfo.email || !registerInfo.password || !registerInfo.repeatPassword) {
+
+    const validationErrors = validation(registerInfo, 'all');
+    setErrors(validationErrors);
+
+    if (!registerInfo.name ||
+      !registerInfo.email ||
+      !registerInfo.password ||
+      !registerInfo.repeatPassword) {
+
       setRegistrationStatus({
         status: "Fail",
-        message: "Por favor, completa todos los campos"
-      });
+        message: "Faltan completar campos obligatorios"
+      })
+
     } else {
-      if (!errors.name && !errors.email && !errors.password && !errors.repeatPassword) {
-        try {
-          const registrationStatus = await register(registerInfo);
-  
-          if (registrationStatus.status === "Success") {
-            const userCredential = await createUserWithEmailAndPassword(auth, registerInfo.email, registerInfo.password);
+
+      if (!errors.name &&
+        !errors.email &&
+        !errors.password &&
+        !errors.repeatPassword) {
+
+        const registrationStatus = await register(registerInfo);
+
+        if (registrationStatus.status === "Success") {
+
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, registerInfo.email, registerInfo.password)
             const user = userCredential.user;
-            
+
             await sendEmailVerification(user);
 
             setRegistrationStatus({
@@ -101,19 +116,21 @@ function SignUp() {
             setTimeout(() => {
               navigate("/verifyemail");
             }, 2000);
-          } else {
-            
+          } catch (error) {
             setRegistrationStatus({
               status: "Fail",
-              message: "Ya existe un usuario con ese email"
-            });
+              message: "Error de autenticación de terceros"
+            })
           }
-        } catch (error) {
-          setRegistrationStatus({
-            status: "Fail",
-            message: "Error al registrar. Por favor, inténtalo de nuevo."
-          });
+        } else {
+          setRegistrationStatus({ ...registrationStatus })
         }
+
+      } else {
+        setRegistrationStatus({
+          status: "Fail",
+          message: "Hay campos mal completados"
+        });
       }
     }
   }
@@ -268,13 +285,6 @@ function SignUp() {
         {registrationStatus ?
           <p className={registrationStatus.status === "Success" ? styles.txtSemiBold16Green : styles.txtError16}>{registrationStatus.message}</p>
           : null}
-        {/* <p className={styles.txtSemiBold12Purple}>O INICIA SESION CON</p>
-        <button className={styles.btnGoogle}>
-          <svg className={styles.icn} xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0,0,256,256">
-            <g fill="#3e3e70" fill-rule="nonzero" stroke="none" strokeWidth="1" strokeLinecap="butt" strokeLinejoin="miter" stroke-miterlimit="10" stroke-dasharray="" stroke-dashoffset="0" font-family="none" font-weight="none" font-size="none" text-anchor="none" ><g transform="scale(8.53333,8.53333)"><path d="M15.00391,3c-6.629,0 -12.00391,5.373 -12.00391,12c0,6.627 5.37491,12 12.00391,12c10.01,0 12.26517,-9.293 11.32617,-14h-1.33008h-2.26758h-7.73242v4h7.73828c-0.88958,3.44825 -4.01233,6 -7.73828,6c-4.418,0 -8,-3.582 -8,-8c0,-4.418 3.582,-8 8,-8c2.009,0 3.83914,0.74575 5.24414,1.96875l2.8418,-2.83984c-2.134,-1.944 -4.96903,-3.12891 -8.08203,-3.12891z"></path></g></g>
-          </svg>
-          Google
-        </button> */}
         <div className={styles.containerSignIn}>
           <p className={styles.txtSemiBold16Green}>¿Ya tenés cuenta?</p>
           <Link className={styles.txtSemiBold16Green} to="/signin">Iniciar sesión</Link>

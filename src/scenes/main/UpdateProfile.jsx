@@ -16,7 +16,7 @@ function UpdateProfile() {
     const navigate = useNavigate();
     const localStorageUser = JSON.parse(localStorage.getItem('currentUser'));
     const userId = localStorageUser.id;
-    console.log("este es el user",userId)
+    console.log("este es el user", userId)
 
     const [newUserInfo, setNewUserInfo] = useState({
         name: null,
@@ -109,12 +109,15 @@ function UpdateProfile() {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        console.log("ADENTRO DEL HADLE SUBMIT", newUserInfo);
+
+        const validationErrors = validation(newUserInfo, 'all');
+        setErrors(validationErrors);
 
         if (newUserInfo.name &&
             newUserInfo.email &&
             newUserInfo.password &&
             newUserInfo.repeatPassword) {
+
             if (!errors.name &&
                 !errors.email &&
                 !errors.password &&
@@ -122,11 +125,10 @@ function UpdateProfile() {
 
                 console.log("ADENTRO DEL IF");
 
-                const updateStatus = await updateUser(userId, newUserInfo);
-                console.log("este es el status",updateStatus)
-                setUpdateStatus({ ...updateStatus })
+                const updateResult = await updateUser(userId, newUserInfo);
+                setUpdateStatus(updateResult.updateStatus);
 
-                if (updateStatus.updateStatus?.status === "Success") {
+                if (updateResult.updateStatus?.status === "Success") {
 
                     await updateProfile(auth.currentUser, {
                         displayName: newUserInfo.name,
@@ -146,6 +148,8 @@ function UpdateProfile() {
                 status: "Fail",
                 message: "Faltan completar campos obligatorios"
             })
+
+            console.log(updateStatus);
         };
     };
 
